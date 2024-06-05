@@ -50,10 +50,10 @@ var doc airlineInfo
 var flight flightInfo
 var aircraft aircraftInfo
 
-func ViaFlightNum(flightNum string) (flightInfo, airlineInfo, aircraftInfo, string) {
+func ViaFlightNum(flightNum string, credentials string) (flightInfo, airlineInfo, aircraftInfo, string) {
 	num := regexp.MustCompile(`\d`).MatchString(flightNum) // confirm number is included
 	if !num { log.Fatal("Invalid flight number!") } // stop if no number
-	client := Login() // log into database
+	client := Login(credentials) // log into database
 
 	// must be seperate filters, one OR the other must be found
 	filter := bson.D{{"ICAO", strings.ToUpper(string(flightNum[0:3]))}}
@@ -153,8 +153,8 @@ func ViaFlightNum(flightNum string) (flightInfo, airlineInfo, aircraftInfo, stri
 }
 
 // get nonstop flights via start and end cities
-func FindDirect(startAirports []airportInfo, endAirports []airportInfo) flightInfo {
-	client := Login()
+func FindDirect(startAirports []airportInfo, endAirports []airportInfo, credentials string) flightInfo {
+	client := Login(credentials)
 	var flights []flightInfo
 
 	var startIsHub, endIsHub bool = false, false
