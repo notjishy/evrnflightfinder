@@ -8,9 +8,7 @@ import (
 	"fmt"
 )
 
-var credentials string = "urmom"
-
-func FindFlights(start string, destination string) {
+func FindFlights(start string, destination string, credentials string) {
 	startAirports := flightfinder.GetAirportsViaCity(start, credentials)
 	endAirports := flightfinder.GetAirportsViaCity(destination, credentials)
 
