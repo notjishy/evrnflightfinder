@@ -12,7 +12,7 @@ var Ctx = context.TODO()
 
 func Login(credentials) (*mongo.Client) {
 	// login to db
-	clientOptions := options.Client().ApplyURI("")
+	clientOptions := options.Client().ApplyURI(credentials)
 	client, err := mongo.Connect(Ctx, clientOptions)
 	if err != nil { log.Fatal(err) }
 
