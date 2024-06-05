@@ -19,17 +19,17 @@ type airportInfo struct {
 
 var airport airportInfo
 
-func getCollection() (*mongo.Collection) {
-	client := Login()
+func getCollection(credentials string) (*mongo.Collection) {
+	client := Login(credentials)
 	coll := client.Database("airports").Collection("airports")
 	
 	return coll
 }
 
-func GetAirportViaCode(airportCode string, org string) (airportInfo, bool) {
+func GetAirportViaCode(airportCode string, org string, credentials string) (airportInfo, bool) {
 	if airportCode == "" { return airport, false }
 
-	coll := getCollection()
+	coll := getCollection(credentials)
 
 	filter := bson.D{{org + "_code", airportCode}}
 	err := coll.FindOne(Ctx, filter).Decode(&airport)
@@ -38,8 +38,8 @@ func GetAirportViaCode(airportCode string, org string) (airportInfo, bool) {
 	return airport, true
 }
 
-func GetAirportsViaCity(city string) []airportInfo {
-	coll := getCollection()
+func GetAirportsViaCity(city string, credentials string) []airportInfo {
+	coll := getCollection(credentials)
 
 	filter := bson.D{{"city", strings.ToUpper(city)}}
 

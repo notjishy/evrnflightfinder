@@ -10,7 +10,7 @@ import (
 var Collection *mongo.Collection
 var Ctx = context.TODO()
 
-func Login(credentials) (*mongo.Client) {
+func Login(credentials string) (*mongo.Client) {
 	// login to db
 	clientOptions := options.Client().ApplyURI(credentials)
 	client, err := mongo.Connect(Ctx, clientOptions)
