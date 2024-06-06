@@ -12,7 +12,10 @@ func FindFlights(start string, destination string, credentials string) {
 	startAirports := flightfinder.GetAirportsViaCity(start, credentials)
 	endAirports := flightfinder.GetAirportsViaCity(destination, credentials)
 
-	flight := flightfinder.FindDirect(startAirports, endAirports, credentials)
+	directFlights := flightfinder.FindDirect(startAirports, endAirports, credentials)
 
-	fmt.Println(flight)
+	fmt.Println("Direct Flights: ")
+	for _, flight := range directFlights {
+		fmt.Println(flight)
+	}
 }
