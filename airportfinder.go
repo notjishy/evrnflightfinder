@@ -28,6 +28,7 @@ func getCollection(credentials string) (*mongo.Collection) {
 
 func GetAirportViaCode(airportCode string, org string, credentials string) (airportInfo, bool) {
 	if airportCode == "" { return airport, false }
+	airportCode = strings.ToUpper(airportCode)
 
 	coll := getCollection(credentials)
 
