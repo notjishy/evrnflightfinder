@@ -23,6 +23,7 @@ type airlineInfo struct {
 
 type flightInfo struct {
 	ID                   primitive.ObjectID `bson:"_id"`
+	Airline              string
 	FlightNum            int32              `bson:"flightNum"`
 	IsReturn             bool               `bson:"isReturn"`
 	Start                string             `bson:"start"`
@@ -116,6 +117,7 @@ func ViaFlightNum(flightNum string, credentials string) (flightInfo, airlineInfo
 		filter := bson.D{{"flightNum", v},{"isActive", true}}
 
 		err = Collection.FindOne(Ctx, filter).Decode(&flight)
+		flight.Airline = airlinedb
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
 				if i+1 == len(collections) { log.Fatalf("No flights found. %v", err) }
@@ -172,9 +174,49 @@ func FindDirect(startAirports []airportInfo, endAirports []airportInfo, credenti
 		if endIsHub {
 			flights = getHubFlightViaAirports(flights, client, dbname, endAirport, startAirports, true)
 		}
+
+		// find non-hub direct flights
+		flights = getNonHubFlightViaAirports(flights, client, dbname, startAirports, endAirports)
 	}
 
 	return flights
+}
+
+func getNonHubFlightViaAirports(flights []flightInfo, client *mongo.Client, dbname string, startAirports []airportInfo, endAirports []airportInfo) []flightInfo {
+	collectionNames, err := client.Database(dbname).ListCollectionNames(Ctx, bson.M{})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// iterate over collections
+	for _, collectionName := range collectionNames {
+		coll := client.Database(dbname).Collection(collectionName)
+
+		for _, startAirport := range startAirports {
+			for _, endAirport := range endAirports {
+				filter := bson.D{{"start", startAirport.ICAO},{"destination", endAirport.ICAO},{"isActive", true}}
+
+				cursor, err := coll.Find(Ctx, filter)
+				if err != nil { log.Fatalf("Error finding non-hub direct flights: %v", err) }
+				defer cursor.Close(Ctx)
+
+				for cursor.Next(Ctx) {
+					var flight flightInfo
+					if err := cursor.Decode(&flight); err != nil {
+						log.Fatalf("Error decoding document: %v", err)
+					}
+					flight.Airline = dbname
+					flights = append(flights, flight)
+				}
+
+				if err := cursor.Err(); err != nil {
+					log.Fatalf("Error iterating cursor: %v", err)
+				}
+			}
+		}
+	}
+
+	return flights;
 }
 
 func getHubFlightViaAirports(flights []flightInfo, client *mongo.Client, dbname string, startAirport airportInfo, endAirports []airportInfo, isReturn bool) ([]flightInfo) {
@@ -192,6 +234,7 @@ func getHubFlightViaAirports(flights []flightInfo, client *mongo.Client, dbname 
 			if err := cursor.Decode(&flight); err != nil {
 				log.Fatalf("Error decoding document: %v", err)
 			}
+			flight.Airline = dbname
 			flights = append(flights, flight)
 		}
 	
