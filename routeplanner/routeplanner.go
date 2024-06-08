@@ -20,14 +20,19 @@ func FindFlights(start string, destination string, credentials string) {
 			fmt.Println(flight)
 		}
 	} else {
-		nonDirectFlights := flightfinder.FindIndirect(startAirports, endAirports, credentials)
+		nonDirectFlights := flightfinder.FindConnections(startAirports, endAirports, credentials)
 
 		fmt.Println("Non-Direct Flights: ")
+		var allowBreak bool = false
 		for _, flight := range nonDirectFlights {
 			if flight.Notes == "BREAK" {
-				fmt.Println("")
+				if allowBreak {
+					fmt.Println("")
+					allowBreak = false
+				}
 			} else {
 				fmt.Println(flight)
+				allowBreak = true
 			}
 		}
 	}

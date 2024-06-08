@@ -184,11 +184,13 @@ func FindDirect(startAirports []airportInfo, endAirports []airportInfo, credenti
 }
 
 // get non-direct flights via start and end cities, will include a connection in returned flights
-func FindIndirect(startAirports []airportInfo, endAirports []airportInfo, credentials string) []flightInfo {
+func FindConnections(startAirports []airportInfo, endAirports []airportInfo, credentials string) []flightInfo {
 	client := Login(credentials)
 	var flights []flightInfo
+	var startFlights []flightInfo
+	var endFlights []flightInfo
 
-	// this is inserted into the returned array so any iterating loops will know when to seperate groups of flights
+	// used for sperating groups
 	var breakFlight flightInfo
 	breakFlight.Notes = "BREAK"
 
@@ -196,52 +198,95 @@ func FindIndirect(startAirports []airportInfo, endAirports []airportInfo, creden
 		collections, err := client.Database(dbname).ListCollectionNames(Ctx, bson.M{})
 		if err != nil { log.Fatalf("there was an error grabbing collection names: %v", err) }
 
-		// find connections
-		var connections []string
-		for _, collectionName := range collections {
-			coll := client.Database(dbname).Collection(collectionName)
+		for _, collection := range collections {
+			coll := client.Database(dbname).Collection(collection)
 
-
-			var req1, req2 bool = false, false
 			for _, startAirport := range startAirports {
-				filter := bson.D{{"airport", startAirport.ICAO},{"isActive", true},{"isReturn", true}}
+				filter1 := bson.D{{"start", startAirport.ICAO},{"isActive", true}}
+				filter2 := bson.D{}
+				if collection == strings.ToLower(startAirport.ICAO) {
+					filter2 = bson.D{{"isActive", true},{"isReturn", false}}
+				} else {
+					filter2 = bson.D{{"airport", startAirport.ICAO},{"isActive", true},{"isReturn", true}}
+				}
+				var flightFilters = []bson.D{filter1, filter2}
 
-				cursor, err := coll.Find(Ctx, filter)
-				if err != nil { log.Fatalf("Error finding connections flights: %v", err) }
-				defer cursor.Close(Ctx)
+				for _, filter := range flightFilters {
+					cursor, err := coll.Find(Ctx, filter)
+					if err != nil { log.Fatalf("Error finding flights in filters: %v", err) }
+					defer cursor.Close(Ctx)
 
-				// set if the first requirement has been met (if cursor.Next returns true then it is met)
-				if cursor.Next(Ctx) { req1 = true }
+					for cursor.Next(Ctx) {
+						var flight flightInfo
+						if err := cursor.Decode(&flight); err != nil {
+							log.Fatalf("Error decoding documents: %v", err)
+						}
+						flight.Airline = dbname
+						if flight.Start == "" && flight.Destination == "" {
+							if flight.IsReturn == true {
+								flight.Destination = strings.ToUpper(collection)
+								flight.Start = flight.Airport
+							} else {
+								flight.Start = strings.ToUpper(collection)
+								flight.Destination = flight.Airport
+							}
+						}
+
+						startFlights = append(startFlights, flight)
+					}
+				}
 			}
 
 			for _, endAirport := range endAirports {
-				filter := bson.D{{"airport", endAirport.ICAO},{"isActive", true},{"isReturn", false}}
+				filter1 := bson.D{{"destination", endAirport.ICAO},{"isActive", true}}
+				filter2 := bson.D{}
+				if collection == strings.ToLower(endAirport.ICAO) {
+					filter2 = bson.D{{"isActive", true},{"isReturn", true}}
+				} else {
+					filter2 = bson.D{{"airport", endAirport.ICAO},{"isActive", true},{"isReturn", false}}
+				}
+				var flightFilters = []bson.D{filter1, filter2}
 
-				cursor, err := coll.Find(Ctx, filter)
-				if err != nil { log.Fatalf("Error finding connections flights: %v", err) }
-				defer cursor.Close(Ctx)
+				for _, filter := range flightFilters {
+					cursor, err := coll.Find(Ctx, filter)
+					if err != nil { log.Fatalf("Error finding flights in filters: %v", err) }
+					defer cursor.Close(Ctx)
 
-				if cursor.Next(Ctx) { req2 = true }
-			}
+					for cursor.Next(Ctx) {
+						var flight flightInfo
+						if err := cursor.Decode(&flight); err != nil {
+							log.Fatalf("Error decoding documents: %v", err)
+						}
+						flight.Airline = dbname
+						if flight.Start == "" && flight.Destination == "" {
+							if flight.IsReturn == true {
+								flight.Destination = strings.ToUpper(collection)
+								flight.Start = flight.Airport
+							} else {
+								flight.Start = strings.ToUpper(collection)
+								flight.Destination = flight.Airport
+							}
+						}
 
-			if req1 == true && req2 == true {
-				connections = append(connections, collectionName)
+						endFlights = append(endFlights, flight)
+					}
+				}
 			}
 		}
+	}
 
-		// get flights for connections
-		for _, connection := range connections {
-			connectionAirport, success := GetAirportViaCode(connection, "icao", credentials)
-			if !success { log.Fatalf("Error getting airport via code: %v", err) }
-
-			// get first flight
-			flights = getHubFlightViaAirports(flights, client, dbname, connectionAirport, startAirports, true)
-
-			// get second flight
-			flights = getHubFlightViaAirports(flights, client, dbname, connectionAirport, endAirports, false)
-
-			flights = append(flights, breakFlight)
+	for _, startFlight := range startFlights {
+		startFlightAppended := false
+		for _, endFlight := range endFlights {
+			if endFlight.Start == startFlight.Destination {
+				if !startFlightAppended {
+					flights = append(flights, startFlight)
+					startFlightAppended = true
+				}
+				flights = append(flights, endFlight)
+			}
 		}
+		flights = append(flights, breakFlight)
 	}
 
 	return flights
