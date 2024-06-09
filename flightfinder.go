@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"math/rand"
 	"time"
+	"github.com/jftuga/geodist"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -194,6 +195,12 @@ func FindConnections(startAirports []airportInfo, endAirports []airportInfo, cre
 	var breakFlight flightInfo
 	breakFlight.Notes = "BREAK"
 
+	// get base distance
+	var startLoc = geodist.Coord{Lat: startAirports[0].Latitude, Lon: startAirports[0].Longitude}
+	var endLoc = geodist.Coord{Lat: endAirports[0].Latitude, Lon: endAirports[0].Longitude}
+	_, baseKm, err := geodist.VincentyDistance(startLoc, endLoc)
+	if err != nil { log.Fatalf("Error calculating base distance! %v", err) }
+
 	for _, dbname := range DBs {
 		collections, err := client.Database(dbname).ListCollectionNames(Ctx, bson.M{})
 		if err != nil { log.Fatalf("there was an error grabbing collection names: %v", err) }
@@ -279,11 +286,20 @@ func FindConnections(startAirports []airportInfo, endAirports []airportInfo, cre
 		startFlightAppended := false
 		for _, endFlight := range endFlights {
 			if endFlight.Start == startFlight.Destination {
-				if !startFlightAppended {
-					flights = append(flights, startFlight)
-					startFlightAppended = true
+				acquireAirport, success := GetAirportViaCode(startFlight.Destination, "icao", credentials)
+				if !success { log.Fatal("Error getting airport from code!") }
+
+				airport := geodist.Coord{Lat: acquireAirport.Latitude, Lon: acquireAirport.Longitude}
+				_, km, err := geodist.VincentyDistance(airport, endLoc)
+				if err != nil { log.Fatalf("Error calculating distance! %v", err) }
+
+				if km < baseKm {
+					if !startFlightAppended {
+						flights = append(flights, startFlight)
+						startFlightAppended = true
+					}
+					flights = append(flights, endFlight)
 				}
-				flights = append(flights, endFlight)
 			}
 		}
 		flights = append(flights, breakFlight)

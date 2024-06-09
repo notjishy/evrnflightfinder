@@ -9,12 +9,14 @@ import (
 )
 
 type airportInfo struct {
-	ID      int32           `bson:"_id"`
-	ICAO    string          `bson:"icao_code"`
-	IATA    string          `bson:"iata_code"`
-	Name    string          `bson:"name"`
-	City    string          `bson:"city"`
-	Country string          `bson:"country"`
+	ID        int32           `bson:"_id"`
+	ICAO      string          `bson:"icao_code"`
+	IATA      string          `bson:"iata_code"`
+	Name      string          `bson:"name"`
+	City      string          `bson:"city"`
+	Country   string          `bson:"country"`
+	Latitude  float64          `bson:"lat_decimal"`
+	Longitude float64          `bson:"lon_decimal"`
 }
 
 var airport airportInfo
@@ -34,7 +36,7 @@ func GetAirportViaCode(airportCode string, org string, credentials string) (airp
 
 	filter := bson.D{{org + "_code", airportCode}}
 	err := coll.FindOne(Ctx, filter).Decode(&airport)
-	if err != nil { log.Fatalf("Error finding airport: %v", err) }
+	if err != nil { log.Fatalf("Error finding airport " + airportCode + ": %v", err) }
 
 	return airport, true
 }
