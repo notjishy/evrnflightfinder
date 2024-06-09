@@ -22,7 +22,7 @@ type airlineInfo struct {
 	Aircraft string         `bson:"aircraft`
 }
 
-type flightInfo struct {
+type FlightInfo struct {
 	ID                   primitive.ObjectID `bson:"_id"`
 	Airline              string
 	FlightNum            int32              `bson:"flightNum"`
@@ -49,10 +49,10 @@ var DBs = [...]string{"evrnair", "flaxair"}
 var orgSearchMethod string
 var airlinedb string
 var doc airlineInfo
-var flight flightInfo
+var flight FlightInfo
 var aircraft aircraftInfo
 
-func ViaFlightNum(flightNum string, credentials string) (flightInfo, airlineInfo, aircraftInfo, string) {
+func ViaFlightNum(flightNum string, credentials string) (FlightInfo, airlineInfo, aircraftInfo, string) {
 	num := regexp.MustCompile(`\d`).MatchString(flightNum) // confirm number is included
 	if !num { log.Fatal("Invalid flight number!") } // stop if no number
 	client := Login(credentials) // log into database
@@ -156,9 +156,9 @@ func ViaFlightNum(flightNum string, credentials string) (flightInfo, airlineInfo
 }
 
 // get direct flights via start and end cities
-func FindDirect(startAirports []airportInfo, endAirports []airportInfo, credentials string) []flightInfo {
+func FindDirect(startAirports []airportInfo, endAirports []airportInfo, credentials string) []FlightInfo {
 	client := Login(credentials)
-	var flights []flightInfo
+	var flights []FlightInfo
 
 	var startIsHub, endIsHub bool = false, false
 	var startAirport, endAirport airportInfo
@@ -185,14 +185,14 @@ func FindDirect(startAirports []airportInfo, endAirports []airportInfo, credenti
 }
 
 // get non-direct flights via start and end cities, will include a connection in returned flights
-func FindConnections(startAirports []airportInfo, endAirports []airportInfo, credentials string) []flightInfo {
+func FindConnections(startAirports []airportInfo, endAirports []airportInfo, credentials string) []FlightInfo {
 	client := Login(credentials)
-	var flights []flightInfo
-	var startFlights []flightInfo
-	var endFlights []flightInfo
+	var flights []FlightInfo
+	var startFlights []FlightInfo
+	var endFlights []FlightInfo
 
 	// used for sperating groups
-	var breakFlight flightInfo
+	var breakFlight FlightInfo
 	breakFlight.Notes = "BREAK"
 
 	// get base distance
@@ -224,7 +224,7 @@ func FindConnections(startAirports []airportInfo, endAirports []airportInfo, cre
 					defer cursor.Close(Ctx)
 
 					for cursor.Next(Ctx) {
-						var flight flightInfo
+						var flight FlightInfo
 						if err := cursor.Decode(&flight); err != nil {
 							log.Fatalf("Error decoding documents: %v", err)
 						}
@@ -260,7 +260,7 @@ func FindConnections(startAirports []airportInfo, endAirports []airportInfo, cre
 					defer cursor.Close(Ctx)
 
 					for cursor.Next(Ctx) {
-						var flight flightInfo
+						var flight FlightInfo
 						if err := cursor.Decode(&flight); err != nil {
 							log.Fatalf("Error decoding documents: %v", err)
 						}
@@ -308,7 +308,7 @@ func FindConnections(startAirports []airportInfo, endAirports []airportInfo, cre
 	return flights
 }
 
-func getNonHubFlightViaAirports(flights []flightInfo, client *mongo.Client, dbname string, startAirports []airportInfo, endAirports []airportInfo) []flightInfo {
+func getNonHubFlightViaAirports(flights []FlightInfo, client *mongo.Client, dbname string, startAirports []airportInfo, endAirports []airportInfo) []FlightInfo {
 	collectionNames, err := client.Database(dbname).ListCollectionNames(Ctx, bson.M{})
 	if err != nil {
 		log.Fatal(err)
@@ -327,7 +327,7 @@ func getNonHubFlightViaAirports(flights []flightInfo, client *mongo.Client, dbna
 				defer cursor.Close(Ctx)
 
 				for cursor.Next(Ctx) {
-					var flight flightInfo
+					var flight FlightInfo
 					if err := cursor.Decode(&flight); err != nil {
 						log.Fatalf("Error decoding document: %v", err)
 					}
@@ -345,7 +345,7 @@ func getNonHubFlightViaAirports(flights []flightInfo, client *mongo.Client, dbna
 	return flights;
 }
 
-func getHubFlightViaAirports(flights []flightInfo, client *mongo.Client, dbname string, startAirport airportInfo, endAirports []airportInfo, isReturn bool) ([]flightInfo) {
+func getHubFlightViaAirports(flights []FlightInfo, client *mongo.Client, dbname string, startAirport airportInfo, endAirports []airportInfo, isReturn bool) ([]FlightInfo) {
 	coll := client.Database(dbname).Collection(strings.ToLower(startAirport.ICAO))
 
 	for  _, endAirport := range endAirports {
@@ -356,7 +356,7 @@ func getHubFlightViaAirports(flights []flightInfo, client *mongo.Client, dbname 
 		defer cursor.Close(Ctx)
 	
 		for cursor.Next(Ctx) {
-			var flight flightInfo
+			var flight FlightInfo
 			if err := cursor.Decode(&flight); err != nil {
 				log.Fatalf("Error decoding document: %v", err)
 			}
