@@ -3,6 +3,7 @@ package flightfinder
 import (
 	"log"
 	"strings"
+	"context"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/bson"
 	//"fmt"
@@ -21,38 +22,31 @@ type airportInfo struct {
 
 var airport airportInfo
 
-func getCollection(credentials string) (*mongo.Collection) {
-	client := Login(credentials)
-	coll := client.Database("airports").Collection("airports")
-	
-	return coll
-}
-
-func GetAirportViaCode(airportCode string, org string, credentials string) (airportInfo, bool) {
+func GetAirportViaCode(airportCode string, org string, client *mongo.Client, ctx context.Context) (airportInfo, bool) {
 	if airportCode == "" { return airport, false }
 	airportCode = strings.ToUpper(airportCode)
 
-	coll := getCollection(credentials)
+	coll := client.Database("airports").Collection("airports")
 
 	filter := bson.D{{org + "_code", airportCode}}
-	err := coll.FindOne(Ctx, filter).Decode(&airport)
+	err := coll.FindOne(ctx, filter).Decode(&airport)
 	if err != nil { log.Fatalf("Error finding airport " + airportCode + ": %v", err) }
 
 	return airport, true
 }
 
-func GetAirportsViaCity(city string, credentials string) []airportInfo {
-	coll := getCollection(credentials)
+func GetAirportsViaCity(city string, client *mongo.Client, ctx context.Context) []airportInfo {
+	coll := client.Database("airports").Collection("airports")
 
 	filter := bson.D{{"city", strings.ToUpper(city)}}
 
-	cursor, err := coll.Find(Ctx, filter)
+	cursor, err := coll.Find(ctx, filter)
 	if err != nil { log.Fatalf("Error finding airports via city: %v", err) }
-	defer cursor.Close(Ctx)
+	defer cursor.Close(ctx)
 
 	var airports []airportInfo
 
-	for cursor.Next(Ctx) {
+	for cursor.Next(ctx) {
 		var airport airportInfo
 		if err := cursor.Decode(&airport); err != nil {
 			log.Fatalf("Error decoding document: %v", err)
