@@ -37,6 +37,7 @@ type FlightInfo struct {
 	Check                bool     `bson:"check"`
 	IsActive             bool     `bson:"isActive"`
 	Notes                string   `bson:"notes"`
+	Distance             float64
 }
 
 type aircraftInfo struct {
@@ -125,9 +126,7 @@ func ViaFlightNum(flightNum string, client *mongo.Client, ctx context.Context) (
 		collection := client.Database(airlinedb).Collection(coll)
 
 		filter := bson.D{{"flightNum", v}, {"isActive", true}}
-
 		err = collection.FindOne(ctx, filter).Decode(&flight)
-		flight.Airline = airlinedb
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
 				if i+1 == len(collections) {
@@ -138,6 +137,7 @@ func ViaFlightNum(flightNum string, client *mongo.Client, ctx context.Context) (
 			break
 		}
 	}
+	flight.Airline = airlinedb
 
 	if flight.Start == "" || flight.Destination == "" {
 		if flight.IsReturn == false {
@@ -148,6 +148,9 @@ func ViaFlightNum(flightNum string, client *mongo.Client, ctx context.Context) (
 			flight.Destination = strings.ToUpper(coll)
 		}
 	}
+
+	// get flight distance
+	flight.Distance = getFlightDistance(flight, client, ctx)
 
 	var aircraftType string
 	if doc.Aircraft == "" {
@@ -264,6 +267,8 @@ func FindConnections(startAirports []airportInfo, endAirports []airportInfo, cli
 							}
 						}
 
+						flight.Distance = getFlightDistance(flight, client, ctx)
+
 						startFlights = append(startFlights, flight)
 					}
 				}
@@ -301,6 +306,8 @@ func FindConnections(startAirports []airportInfo, endAirports []airportInfo, cli
 								flight.Destination = flight.Airport
 							}
 						}
+
+						flight.Distance = getFlightDistance(flight, client, ctx)
 
 						endFlights = append(endFlights, flight)
 					}
@@ -384,6 +391,19 @@ func getNonHubFlightViaAirports(flights []FlightInfo, client *mongo.Client, ctx 
 						log.Fatalf("Error decoding document: %v", err)
 					}
 					flight.Airline = dbname
+
+					if flight.Start == "" && flight.Destination == "" {
+						if flight.IsReturn == true {
+							flight.Destination = strings.ToUpper(collectionName)
+							flight.Start = flight.Airport
+						} else {
+							flight.Start = strings.ToUpper(collectionName)
+							flight.Destination = flight.Airport
+						}
+					}
+
+					flight.Distance = getFlightDistance(flight, client, ctx)
+
 					flights = append(flights, flight)
 				}
 
@@ -415,6 +435,19 @@ func getHubFlightViaAirports(flights []FlightInfo, client *mongo.Client, ctx con
 				log.Fatalf("Error decoding document: %v", err)
 			}
 			flight.Airline = dbname
+
+			if flight.Start == "" && flight.Destination == "" {
+				if flight.IsReturn == true {
+					flight.Destination = strings.ToUpper(strings.ToLower(startAirport.ICAO))
+					flight.Start = flight.Airport
+				} else {
+					flight.Start = strings.ToUpper(strings.ToLower(startAirport.ICAO))
+					flight.Destination = flight.Airport
+				}
+			}
+
+			flight.Distance = getFlightDistance(flight, client, ctx)
+
 			flights = append(flights, flight)
 		}
 
@@ -424,4 +457,25 @@ func getHubFlightViaAirports(flights []FlightInfo, client *mongo.Client, ctx con
 	}
 
 	return flights
+}
+
+func getFlightDistance(flight FlightInfo, client *mongo.Client, ctx context.Context) float64 {
+	// get distance of flight
+	start, success := GetAirportViaCode(flight.Start, "icao", client, ctx)
+	if !success {
+		log.Fatalf("Error getting airport information: " + flight.Start)
+	}
+	end, success := GetAirportViaCode(flight.Destination, "icao", client, ctx)
+	if !success {
+		log.Fatalf("Error getting airport information: " + flight.Destination)
+	}
+
+	var startLoc = geodist.Coord{Lat: start.Latitude, Lon: start.Longitude}
+	var endLoc = geodist.Coord{Lat: end.Latitude, Lon: end.Longitude}
+	_, km, err := geodist.VincentyDistance(startLoc, endLoc)
+	if err != nil {
+		log.Fatalf("Error calculating base distance! %v", err)
+	}
+
+	return km
 }
