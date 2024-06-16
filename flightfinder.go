@@ -343,13 +343,7 @@ func FindConnections(startAirports []airportInfo, endAirports []airportInfo, cli
 				}
 
 				if validateFlight {
-					airport := geodist.Coord{Lat: connectionAirport.Latitude, Lon: connectionAirport.Longitude}
-					_, km, err := geodist.VincentyDistance(airport, endLoc)
-					if err != nil {
-						log.Fatalf("Error calculating distance! %v", err)
-					}
-
-					if km <= (baseKm * 1.1) {
+					if endFlight.Distance <= (baseKm * 1.1) {
 						if !startFlightAppended {
 							flights = append(flights, startFlight)
 							startFlightAppended = true
