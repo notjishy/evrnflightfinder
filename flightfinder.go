@@ -351,6 +351,9 @@ func FindConnections(startAirports []airportInfo, endAirports []airportInfo, cli
 						flights = append(flights, endFlight)
 					}
 				}
+
+				// for organization when looping through results
+				breakFlight.Distance = startFlight.Distance + endFlight.Distance
 			}
 		}
 		flights = append(flights, breakFlight)
