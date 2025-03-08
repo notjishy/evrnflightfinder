@@ -349,4 +349,32 @@ func getNonHubFlightViaAirports(flights []FlightInfo, client *mongo.Client, ctx 
 
 				for cursor.Next(ctx) {
 					var flight FlightInfo
+				    if err := cursor.Decode(&flight); err != nil {
+				        log.Fatalf("Error decoding document: %v", err)
+				    }
+				    flight.Airline = dbname
+				    
+				    if flight.Start == "" && flight.Destination == "" {
+				        if flight.IsReturn == true {
+				            flight.Destination = strings.ToUpper(collectionName)
+				            flight.Start = flight.Airport
+				        } else {
+				            flight.Start = strings.ToUpper(collectionName)
+				            flight.Destination = flight.Airport
+				        }
+				    }
+				    
+				    flight.Distance = getFlightDistance(flight, client, ctx)
+				    
+				    flights = append(flights, flight)
+				}
 				
+				if err := cursor.Err(); err != nil {
+				    log.Fatalf("Error iterating cursor: %v", err)
+				}
+			}
+		}
+	}
+	
+	return flights
+}
