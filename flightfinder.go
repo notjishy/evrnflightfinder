@@ -9,44 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jftuga/geodist"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
-	//"fmt"
 )
-
-type airlineInfo struct {
-	ID       primitive.ObjectID `bson:"_id"`
-	ICAO     string             `bson:"ICAO"`
-	IATA     string             `bson:"IATA"`
-	Name     string             `bson:"name"`
-	Aircraft string             `bson:"aircraft"`
-}
-
-type FlightInfo struct {
-	ID                   primitive.ObjectID `bson:"_id"`
-	Airline              string
-	FlightNum            int32    `bson:"flightNum"`
-	IsReturn             bool     `bson:"isReturn"`
-	Start                string   `bson:"start"`
-	Stopover             string   `bson:"stopover"`
-	Destination          string   `bson:"destination"`
-	Airport              string   `bson:"airport"`
-	AllowedAircraftTypes []string `bson:"allowedAircraftTypes"`
-	Check                bool     `bson:"check"`
-	IsActive             bool     `bson:"isActive"`
-	Notes                string   `bson:"notes"`
-	Distance             float64
-}
-
-type aircraftInfo struct {
-	ID           primitive.ObjectID `bson:"_id"`
-	Type         string             `bson:"type"`
-	Manufacturer string             `bson:"manufacturer"`
-	Model        string             `bson:"model"`
-	Liveries     []string           `bson:"liveries"`
-}
 
 var DBs = [...]string{"evrnair", "flaxair"}
 var orgSearchMethod string
@@ -384,95 +349,4 @@ func getNonHubFlightViaAirports(flights []FlightInfo, client *mongo.Client, ctx 
 
 				for cursor.Next(ctx) {
 					var flight FlightInfo
-					if err := cursor.Decode(&flight); err != nil {
-						log.Fatalf("Error decoding document: %v", err)
-					}
-					flight.Airline = dbname
-
-					if flight.Start == "" && flight.Destination == "" {
-						if flight.IsReturn == true {
-							flight.Destination = strings.ToUpper(collectionName)
-							flight.Start = flight.Airport
-						} else {
-							flight.Start = strings.ToUpper(collectionName)
-							flight.Destination = flight.Airport
-						}
-					}
-
-					flight.Distance = getFlightDistance(flight, client, ctx)
-
-					flights = append(flights, flight)
-				}
-
-				if err := cursor.Err(); err != nil {
-					log.Fatalf("Error iterating cursor: %v", err)
-				}
-			}
-		}
-	}
-
-	return flights
-}
-
-func getHubFlightViaAirports(flights []FlightInfo, client *mongo.Client, ctx context.Context, dbname string, startAirport airportInfo, endAirports []airportInfo, isReturn bool) []FlightInfo {
-	coll := client.Database(dbname).Collection(strings.ToLower(startAirport.ICAO))
-
-	for _, endAirport := range endAirports {
-		filter := bson.D{{"airport", endAirport.ICAO}, {"isActive", true}, {"isReturn", isReturn}}
-
-		cursor, err := coll.Find(ctx, filter)
-		if err != nil {
-			log.Fatalf("Error finding flights: %v", err)
-		}
-		defer cursor.Close(ctx)
-
-		for cursor.Next(ctx) {
-			var flight FlightInfo
-			if err := cursor.Decode(&flight); err != nil {
-				log.Fatalf("Error decoding document: %v", err)
-			}
-			flight.Airline = dbname
-
-			if flight.Start == "" && flight.Destination == "" {
-				if flight.IsReturn == true {
-					flight.Destination = strings.ToUpper(strings.ToLower(startAirport.ICAO))
-					flight.Start = flight.Airport
-				} else {
-					flight.Start = strings.ToUpper(strings.ToLower(startAirport.ICAO))
-					flight.Destination = flight.Airport
-				}
-			}
-
-			flight.Distance = getFlightDistance(flight, client, ctx)
-
-			flights = append(flights, flight)
-		}
-
-		if err := cursor.Err(); err != nil {
-			log.Fatalf("Error iterating cursor: %v", err)
-		}
-	}
-
-	return flights
-}
-
-func getFlightDistance(flight FlightInfo, client *mongo.Client, ctx context.Context) float64 {
-	// get distance of flight
-	start, success := GetAirportViaCode(flight.Start, "icao", client, ctx)
-	if !success {
-		log.Fatalf("Error getting airport information: " + flight.Start)
-	}
-	end, success := GetAirportViaCode(flight.Destination, "icao", client, ctx)
-	if !success {
-		log.Fatalf("Error getting airport information: " + flight.Destination)
-	}
-
-	var startLoc = geodist.Coord{Lat: start.Latitude, Lon: start.Longitude}
-	var endLoc = geodist.Coord{Lat: end.Latitude, Lon: end.Longitude}
-	_, km, err := geodist.VincentyDistance(startLoc, endLoc)
-	if err != nil {
-		log.Fatalf("Error calculating base distance! %v", err)
-	}
-
-	return km
-}
+				
