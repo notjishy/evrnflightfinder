@@ -1,6 +1,6 @@
 module github.com/notjishy/evrnflightfinder
 
-go 1.23.4
+go 1.23.7
 
 require (
 	github.com/jftuga/geodist v1.0.0
