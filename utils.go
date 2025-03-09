@@ -2,10 +2,12 @@ package flightfinder
 
 import (
 	"log"
+	"strings"
+
+	"context"
 
 	"github.com/jftuga/geodist"
 	"go.mongodb.org/mongo-driver/mongo"
-	"context"
 )
 
 func getFlightDistance(flight FlightInfo, client *mongo.Client, ctx context.Context) float64 {

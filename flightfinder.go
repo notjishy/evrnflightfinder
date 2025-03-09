@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jftuga/geodist"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -327,6 +328,50 @@ func FindConnections(startAirports []airportInfo, endAirports []airportInfo, cli
 	return flights
 }
 
+
+func getHubFlightViaAirports(flights []FlightInfo, client *mongo.Client, ctx context.Context, dbname string, startAirport airportInfo, endAirports []airportInfo, isReturn bool) []FlightInfo {
+
+
+	coll := client.Database(dbname).Collection(strings.ToLower(startAirport.ICAO))
+
+
+
+
+
+	for _, endAirport := range endAirports {
+		filter := bson.D{{"airport", endAirport.ICAO}, {"isActive", true}, {"isReturn", isReturn}}
+		cursor, err := coll.Find(ctx, filter)
+		if err != nil {
+			log.Fatalf("Error finding flights: %v", err)
+		}
+		defer cursor.Close(ctx)
+		for cursor.Next(ctx) {
+			var flight FlightInfo
+			if err := cursor.Decode(&flight); err != nil {
+				log.Fatalf("Error decoding document: %v", err)
+			}
+			flight.Airline = dbname
+			if flight.Start == "" && flight.Destination == "" {
+				if flight.IsReturn == true {
+					flight.Destination = strings.ToUpper(strings.ToLower(startAirport.ICAO))
+
+					flight.Start = flight.Airport
+				} else {
+					flight.Start = strings.ToUpper(strings.ToLower(startAirport.ICAO))
+
+					flight.Destination = flight.Airport
+				}
+			}
+			flight.Distance = getFlightDistance(flight, client, ctx)
+			flights = append(flights, flight)
+		}
+		if err := cursor.Err(); err != nil {
+			log.Fatalf("Error iterating cursor: %v", err)
+		}
+	}
+	return flights
+}
+
 func getNonHubFlightViaAirports(flights []FlightInfo, client *mongo.Client, ctx context.Context, dbname string, startAirports []airportInfo, endAirports []airportInfo) []FlightInfo {
 	collectionNames, err := client.Database(dbname).ListCollectionNames(ctx, bson.M{})
 	if err != nil {
@@ -353,7 +398,7 @@ func getNonHubFlightViaAirports(flights []FlightInfo, client *mongo.Client, ctx 
 				        log.Fatalf("Error decoding document: %v", err)
 				    }
 				    flight.Airline = dbname
-				    
+
 				    if flight.Start == "" && flight.Destination == "" {
 				        if flight.IsReturn == true {
 				            flight.Destination = strings.ToUpper(collectionName)
@@ -363,18 +408,18 @@ func getNonHubFlightViaAirports(flights []FlightInfo, client *mongo.Client, ctx 
 				            flight.Destination = flight.Airport
 				        }
 				    }
-				    
+
 				    flight.Distance = getFlightDistance(flight, client, ctx)
-				    
+
 				    flights = append(flights, flight)
 				}
-				
+
 				if err := cursor.Err(); err != nil {
 				    log.Fatalf("Error iterating cursor: %v", err)
 				}
 			}
 		}
 	}
-	
+
 	return flights
 }
